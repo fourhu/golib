@@ -36,35 +36,46 @@ func assignStructFields(src, dst reflect.Value) {
 		srcFieldValue := src.FieldByName(fieldName)
 		dstFieldValue := dst.FieldByName(fieldName)
 
+		// 如果字段是匿名的（内嵌的），但在 dst 中不存在，则尝试将 src 内嵌字段的子字段拷贝到 dst 中
+		if field.Anonymous && !dstFieldValue.IsValid() {
+			// 如果 srcFieldValue 是结构体，则直接将其字段拷贝到 dst 中
+			if srcFieldValue.Kind() == reflect.Struct {
+				assignStructFields(srcFieldValue, dst)
+			}
+			continue
+		}
+
 		// 检查字段是否有效
 		if srcFieldValue.IsValid() && dstFieldValue.IsValid() {
-			// 检查 srcFieldValue 是否为 nil，且类型为指针
+			// 检查 srcFieldValue 是否为 nil 指针
 			if srcFieldValue.Kind() == reflect.Ptr && srcFieldValue.IsNil() {
-				// 如果 srcFieldValue 是 nil 指针，则跳过它
 				continue
 			}
+			// 如果字段值为零值，则跳过
 			if srcFieldValue.IsZero() {
 				continue
 			}
 
+			// 对于 time.Time 类型特殊处理
 			if field.Type == reflect.TypeOf(time.Time{}) {
 				dstFieldValue.Set(srcFieldValue)
 				continue
 			}
 
+			// 如果字段是结构体，则递归处理
 			if srcFieldValue.Kind() == reflect.Struct {
 				assignStructFields(srcFieldValue, dstFieldValue)
 				continue
 			}
 
+			// 如果字段是 slice，则调用相应的处理函数
 			if srcFieldValue.Kind() == reflect.Slice {
 				assignSliceFields(srcFieldValue, dstFieldValue)
 				continue
 			}
 
-			// 判断类型是否一样
+			// 如果类型匹配，则直接设置
 			if srcFieldValue.Kind() == dstFieldValue.Kind() {
-				// 设置 dstFieldValue 的值
 				dstFieldValue.Set(srcFieldValue)
 			}
 		}
